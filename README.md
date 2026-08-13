@@ -1,4 +1,4 @@
-# Mi Presupuesto — versión 2.1 corregida
+# MyMoney — versión 2.1 corregida
 
 Aplicación web instalable (PWA) para iPhone orientada a responder una pregunta principal:
 
