@@ -1,4 +1,4 @@
-# Mi Presupuesto — versión definitiva 2.0
+# Mi Presupuesto — versión 2.1 corregida
 
 Aplicación web instalable (PWA) para iPhone orientada a responder una pregunta principal:
 
@@ -55,3 +55,8 @@ Ingresos
 La web puede estar alojada públicamente, pero los datos financieros que introduces NO están dentro de los archivos publicados. Se guardan localmente en tu navegador/dispositivo.
 
 Haz copias de seguridad periódicas desde Más > Exportar copia.
+
+
+## Corrección 2.1
+- Corregido el panel modal “Añadir” que podía aparecer abierto y vacío al cargar la página.
+- Actualizada la versión de caché del Service Worker para forzar al iPhone a descargar los archivos corregidos.

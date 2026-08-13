@@ -1,4 +1,8 @@
 
+/* Importante: el atributo HTML hidden debe prevalecer sobre cualquier display del componente. */
+[hidden]{display:none!important}
+
+
 :root{
   --bg:#080d18;
   --card:#111a2b;
