@@ -1,5 +1,5 @@
 
-const CACHE='mi-presupuesto-definitivo-v2-1';
+const CACHE='mi-presupuesto-definitivo-v2-2';
 const FILES=['./','./index.html','./app.css','./app.js','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));

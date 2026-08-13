@@ -253,7 +253,7 @@
         <article class="card">
           <h3>Estado de la app</h3>
           <div class="summary-lines compact">
-            <div><span>Versión</span><strong>2.1 corregida</strong></div>
+            <div><span>Versión</span><strong>2.2</strong></div>
             <div><span>Modo offline</span><strong id="offlineStatus">Disponible</strong></div>
             <div><span>Última copia exportada</span><strong id="lastBackup">Nunca</strong></div>
           </div>
@@ -263,7 +263,17 @@
 
     <nav class="bottom-nav" aria-label="Navegación principal">
       <button class="nav-btn active" data-view="home"><span>⌂</span><small>Inicio</small></button>
-      <button class="nav-btn" data-view="movements"><span>↕</span><small>Movimientos</small></button>
+      <button class="nav-btn" data-view="movements">
+        <span class="nav-svg" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img">
+            <path d="M8 4v15"></path>
+            <path d="M4.5 7.5L8 4l3.5 3.5"></path>
+            <path d="M16 20V5"></path>
+            <path d="M12.5 16.5L16 20l3.5-3.5"></path>
+          </svg>
+        </span>
+        <small>Movimientos</small>
+      </button>
       <button class="nav-btn" data-view="financing"><span>▤</span><small>Financiaciones</small></button>
       <button class="nav-btn" data-view="planning"><span>◫</span><small>Planificar</small></button>
       <button class="nav-btn" data-view="more"><span>•••</span><small>Más</small></button>

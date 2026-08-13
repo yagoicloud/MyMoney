@@ -1,4 +1,4 @@
-# MyMoney — versión 2.1 corregida
+# Mi Presupuesto — versión 2.1 corregida
 
 Aplicación web instalable (PWA) para iPhone orientada a responder una pregunta principal:
 
@@ -60,3 +60,8 @@ Haz copias de seguridad periódicas desde Más > Exportar copia.
 ## Corrección 2.1
 - Corregido el panel modal “Añadir” que podía aparecer abierto y vacío al cargar la página.
 - Actualizada la versión de caché del Service Worker para forzar al iPhone a descargar los archivos corregidos.
+
+## Corrección 2.2
+- Sustituido el símbolo emoji de la pestaña Movimientos por un icono SVG vectorial.
+- El nuevo icono es monocromo, sin fondo y hereda el color activo/inactivo de la barra inferior.
+- Actualizada la caché para que Safari descargue el cambio.
