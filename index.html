@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mi Presupuesto">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="app.css">
+  <title>Mi Presupuesto</title>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow" id="monthLabel">Este mes</div>
+        <h1>Mi Presupuesto</h1>
+      </div>
+      <button class="icon-btn" id="quickAddBtn" aria-label="Añadir gasto">＋</button>
+    </header>
+
+    <main>
+      <section id="view-home" class="view active">
+        <article class="hero card">
+          <div class="hero-top">
+            <div>
+              <div class="muted tiny">PUEDES GASTAR TODAVÍA ESTE MES</div>
+              <div id="safeToSpend" class="hero-amount positive">0,00 €</div>
+            </div>
+            <div id="trafficLight" class="traffic green" title="Estado del presupuesto"></div>
+          </div>
+          <div class="progress-shell"><div id="monthProgress" class="progress-fill"></div></div>
+          <div class="hero-grid">
+            <div><span class="muted">Por día restante</span><strong id="perDay">0,00 €</strong></div>
+            <div><span class="muted">Por semana restante</span><strong id="perWeek">0,00 €</strong></div>
+          </div>
+          <div id="mainAlert" class="alert ok">Añade tus datos para empezar.</div>
+        </article>
+
+        <div class="metrics-grid">
+          <article class="metric card"><span>Ingresos</span><strong id="kpiIncome">0,00 €</strong></article>
+          <article class="metric card"><span>Comprometido</span><strong id="kpiCommitted">0,00 €</strong></article>
+          <article class="metric card"><span>Variable gastado</span><strong id="kpiVariable">0,00 €</strong></article>
+          <article class="metric card"><span>Ahorro reservado</span><strong id="kpiSavings">0,00 €</strong></article>
+        </div>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h2>Distribución del mes</h2>
+            <span class="chip" id="commitmentPct">0% comprometido</span>
+          </div>
+          <div class="donut-wrap">
+            <div id="budgetDonut" class="donut"><div class="donut-hole"><strong id="donutFree">0%</strong><span>libre</span></div></div>
+            <div id="donutLegend" class="legend"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h2>Próximos pagos</h2>
+            <button class="link-btn" data-go="planning">Ver calendario</button>
+          </div>
+          <div id="upcomingPayments"></div>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h2>Alertas inteligentes</h2>
+            <span class="chip">Automáticas</span>
+          </div>
+          <div id="smartAlerts"></div>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h2>Resumen rápido</h2>
+            <button class="link-btn" data-go="more">Ver historial</button>
+          </div>
+          <div class="summary-lines">
+            <div><span>Gastos fijos</span><strong id="sumFixed">0,00 €</strong></div>
+            <div><span>Cuotas financiadas</span><strong id="sumFinance">0,00 €</strong></div>
+            <div><span>Ahorro mensual</span><strong id="sumSavings">0,00 €</strong></div>
+            <div><span>Colchón sin tocar</span><strong id="sumReserve">0,00 €</strong></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-movements" class="view">
+        <div class="section-head">
+          <div><div class="eyebrow">ENTRADAS Y SALIDAS</div><h2>Movimientos</h2></div>
+          <button class="primary small-btn" id="addVariableBtn">+ Gasto</button>
+        </div>
+
+        <article class="card">
+          <h3>Ingresos fijos mensuales</h3>
+          <div id="incomeList"></div>
+          <button class="secondary full" id="addIncomeBtn">+ Añadir ingreso</button>
+        </article>
+
+        <article class="card">
+          <h3>Gastos fijos mensuales</h3>
+          <div id="fixedList"></div>
+          <button class="secondary full" id="addFixedBtn">+ Añadir gasto fijo</button>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h3>Gastos variables del mes</h3>
+            <button class="link-btn" id="addVariableLink">Añadir</button>
+          </div>
+          <div class="filters">
+            <input id="expenseSearch" type="search" placeholder="Buscar gasto">
+            <select id="expenseCategoryFilter"><option value="">Todas las categorías</option></select>
+          </div>
+          <div id="variableList"></div>
+          <div class="summary-lines compact">
+            <div><span>Total del mes</span><strong id="variableTotalFooter">0,00 €</strong></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h3>Presupuestos por categoría</h3>
+            <button class="link-btn" id="addCategoryBudgetBtn">Añadir</button>
+          </div>
+          <p class="muted small">Opcional. Sirve para avisarte si, por ejemplo, te estás acercando al límite de supermercado u ocio.</p>
+          <div id="categoryBudgets"></div>
+        </article>
+      </section>
+
+      <section id="view-financing" class="view">
+        <div class="section-head">
+          <div><div class="eyebrow">CUOTAS Y DEUDAS</div><h2>Mis financiaciones</h2></div>
+          <button class="primary small-btn" id="addFinanceBtn">+ Nueva</button>
+        </div>
+
+        <div class="metrics-grid">
+          <article class="metric card"><span>Cuotas este mes</span><strong id="financeMonthlyTotal">0,00 €</strong></article>
+          <article class="metric card"><span>Capital pendiente aprox.</span><strong id="financeRemainingTotal">0,00 €</strong></article>
+          <article class="metric card"><span>Financiaciones activas</span><strong id="financeActiveCount">0</strong></article>
+          <article class="metric card"><span>% de ingresos</span><strong id="financeIncomePct">0%</strong></article>
+        </div>
+
+        <article class="card">
+          <h3>Financiaciones activas</h3>
+          <div id="financeList"></div>
+        </article>
+
+        <article class="card">
+          <h3>Calendario de finalización</h3>
+          <div id="financeTimeline"></div>
+        </article>
+
+        <article class="card">
+          <h3>Consejo de carga financiera</h3>
+          <div id="financeAdvice" class="info-box"></div>
+        </article>
+      </section>
+
+      <section id="view-planning" class="view">
+        <div class="section-head">
+          <div><div class="eyebrow">MIRAR HACIA DELANTE</div><h2>Planificación</h2></div>
+        </div>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h3>Previsión próximos 12 meses</h3>
+            <span class="chip">Estimación</span>
+          </div>
+          <p class="muted small">Usa tus ingresos, fijos, cuotas, ahorro y una estimación de gasto variable mensual.</p>
+          <div class="field">
+            <label>Gasto variable mensual estimado</label>
+            <input id="expectedVariable" inputmode="decimal" placeholder="Ej. 400">
+          </div>
+          <div id="forecastChart" class="forecast-chart"></div>
+          <div id="forecastTable"></div>
+        </article>
+
+        <article class="card">
+          <h3>Calendario de pagos de este mes</h3>
+          <div id="paymentCalendar"></div>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h3>Objetivos de ahorro</h3>
+            <button class="link-btn" id="addGoalBtn">Añadir</button>
+          </div>
+          <div id="goalList"></div>
+        </article>
+
+        <article class="card">
+          <h3>Simulador “¿Me lo puedo permitir?”</h3>
+          <p class="muted small">Prueba una compra sin modificar tus datos.</p>
+          <div class="sim-grid">
+            <div class="field"><label>Precio</label><input id="simPrice" inputmode="decimal" placeholder="0"></div>
+            <div class="field"><label>Pago</label><select id="simMode"><option value="cash">Al contado</option><option value="finance">Financiado</option></select></div>
+            <div class="field" id="simMonthsWrap" hidden><label>Meses</label><input id="simMonths" inputmode="numeric" value="12"></div>
+          </div>
+          <div id="simResult" class="info-box">Introduce un precio para simular.</div>
+        </article>
+      </section>
+
+      <section id="view-more" class="view">
+        <div class="section-head">
+          <div><div class="eyebrow">CONTROL Y DATOS</div><h2>Más</h2></div>
+        </div>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h3>Historial mensual</h3>
+            <button class="primary tiny-btn" id="closeMonthBtn">Cerrar mes</button>
+          </div>
+          <p class="muted small">Cerrar el mes guarda una foto de tus cifras para que los cambios futuros no alteren el historial.</p>
+          <div id="historyList"></div>
+        </article>
+
+        <article class="card">
+          <h3>Ajustes de seguridad</h3>
+          <div class="field">
+            <label>Colchón mensual que no quieres gastar</label>
+            <input id="reserveInput" inputmode="decimal" placeholder="Ej. 150">
+          </div>
+          <div class="field">
+            <label>Aviso cuando quede menos del…</label>
+            <select id="warningThreshold">
+              <option value="0.05">5% de los ingresos</option>
+              <option value="0.10">10% de los ingresos</option>
+              <option value="0.15">15% de los ingresos</option>
+              <option value="0.20">20% de los ingresos</option>
+              <option value="0.25">25% de los ingresos</option>
+            </select>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Copia de seguridad y privacidad</h3>
+          <div class="button-grid">
+            <button class="secondary" id="exportBtn">Exportar copia</button>
+            <button class="secondary" id="importBtn">Importar copia</button>
+            <button class="secondary" id="exportCsvBtn">Exportar gastos CSV</button>
+            <button class="danger-btn" id="resetBtn">Borrar todos los datos</button>
+          </div>
+          <input id="importFile" type="file" accept="application/json" hidden>
+          <div class="privacy-note">
+            <strong>Privacidad:</strong> tus datos se guardan en este dispositivo. Esta app no envía información a bancos ni a ningún servidor.
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Estado de la app</h3>
+          <div class="summary-lines compact">
+            <div><span>Versión</span><strong>2.0 definitiva</strong></div>
+            <div><span>Modo offline</span><strong id="offlineStatus">Disponible</strong></div>
+            <div><span>Última copia exportada</span><strong id="lastBackup">Nunca</strong></div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button class="nav-btn active" data-view="home"><span>⌂</span><small>Inicio</small></button>
+      <button class="nav-btn" data-view="movements"><span>↕</span><small>Movimientos</small></button>
+      <button class="nav-btn" data-view="financing"><span>▤</span><small>Financiaciones</small></button>
+      <button class="nav-btn" data-view="planning"><span>◫</span><small>Planificar</small></button>
+      <button class="nav-btn" data-view="more"><span>•••</span><small>Más</small></button>
+    </nav>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <h3 id="modalTitle">Añadir</h3>
+        <button class="icon-btn subtle" id="modalCloseBtn">×</button>
+      </div>
+      <form id="modalForm"></form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
