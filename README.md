@@ -10,7 +10,7 @@ Aplicación web instalable (PWA) para iPhone orientada a responder una pregunta 
 - Límite orientativo diario y semanal.
 - Semáforo de riesgo: verde, amarillo y rojo.
 - Ingresos fijos mensuales.
-- Gastos fijos mensuales.
+- Gastos fijos mensuales y gastos periódicos bimestrales, trimestrales, semestrales o anuales.
 - Gastos variables con fecha, categoría y notas.
 - Límites opcionales por categoría.
 - Sección completa “Mis financiaciones”.
@@ -66,7 +66,7 @@ py -m http.server 8000 --bind 0.0.0.0
 
 Después abre `http://localhost:8000`. MyMoney desactiva automáticamente el Service Worker y elimina únicamente sus cachés cuando se ejecuta en `localhost`, `127.0.0.1` o `0.0.0.0`. Así, los cambios aparecen al recargar sin borrar los datos guardados en `localStorage`.
 
-Si vienes de una versión anterior que todavía controla el navegador, abre una vez `http://localhost:8000/?update=3.0.3`. Las URLs versionadas de los recursos fuerzan la carga del código actual y completan la limpieza automática.
+Si vienes de una versión anterior que todavía controla el navegador, abre una vez `http://localhost:8000/?update=3.1.0`. Las URLs versionadas de los recursos fuerzan la carga del código actual y completan la limpieza automática.
 
 En GitHub Pages el Service Worker continúa activo para mantener el funcionamiento offline.
 
@@ -104,3 +104,11 @@ En GitHub Pages el Service Worker continúa activo para mantener el funcionamien
 - Unificados los textos de creación con el verbo “Añadir”, sin símbolos ni términos inconsistentes.
 - Eliminada la fila vacía “Nómina” que se creaba por defecto y podía confundirse con un ingreso real.
 - Añadida la opción que faltaba para eliminar límites por categoría.
+
+## Versión 3.1
+- Añadida periodicidad mensual, bimestral, trimestral, semestral y anual a los gastos fijos.
+- Para periodicidades no mensuales se solicita el mes del próximo cobro y se calcula el calendario desde ese mes.
+- Los gastos periódicos se aplican al dinero disponible, próximos pagos, calendario y previsión de 12 meses únicamente cuando corresponden.
+- Los gastos existentes y las copias antiguas se conservan como mensuales.
+- Simplificado el campo de financiación “O mes de última cuota” a “Mes de última cuota”.
+- Actualizada la versión de datos, recursos y caché a 3.1.0.

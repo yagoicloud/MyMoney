@@ -1,7 +1,7 @@
 {
   "name": "MyMoney",
   "short_name": "MyMoney",
-  "description": "Controla cuánto puedes gastar cada mes teniendo en cuenta ingresos, gastos, financiaciones y ahorro.",
+  "description": "Controla cuánto puedes gastar cada mes teniendo en cuenta ingresos, gastos periódicos, financiaciones y ahorro.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -7,6 +7,14 @@ const defaultCategories = [
   'Ropa','Suscripciones','Mascotas','Educación','Regalos','Viajes','Otros'
 ];
 
+const fixedFrequencies = [
+  {value:'monthly',label:'Mensual',months:1},
+  {value:'bimonthly',label:'Bimestral',months:2},
+  {value:'quarterly',label:'Trimestral',months:3},
+  {value:'semiannual',label:'Semestral',months:6},
+  {value:'annual',label:'Anual',months:12}
+];
+
 function uid(prefix='id'){
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
 }
@@ -45,10 +53,17 @@ function remainingDays(){
   const d=new Date(), last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
   return Math.max(1,last-d.getDate()+1);
 }
+function fixedFrequencyInfo(value='monthly'){
+  return fixedFrequencies.find(option=>option.value===value)||fixedFrequencies[0];
+}
+function normalizeFixedExpense(expense={}){
+  const frequency=fixedFrequencyInfo(expense.frequency).value;
+  return {...expense,frequency,nextChargeMonth:frequency==='monthly'?'':(expense.nextChargeMonth||'')};
+}
 
 function baseState(){
   return {
-    version:2,
+    version:3,
     createdAt:nowISO(),
     incomes:[],
     fixed:[],
@@ -76,7 +91,7 @@ function migrateOld(){
     const old=JSON.parse(oldRaw);
     const fresh=baseState();
     if(Array.isArray(old.incomes)) fresh.incomes=old.incomes.map(x=>({id:uid('inc'),name:x.name||'Ingreso',amount:x.amount||'',day:1,active:true}));
-    if(Array.isArray(old.fixed)) fresh.fixed=old.fixed.map(x=>({id:uid('fix'),name:x.name||'Gasto fijo',amount:x.amount||'',day:1,category:'Hogar',active:true}));
+    if(Array.isArray(old.fixed)) fresh.fixed=old.fixed.map(x=>normalizeFixedExpense({id:uid('fix'),name:x.name||'Gasto fijo',amount:x.amount||'',day:1,category:'Hogar',active:true}));
     if(Array.isArray(old.finances)) fresh.finances=old.finances.map(x=>({
       id:uid('fin'),name:x.name||'Financiación',monthlyAmount:x.amount||'',dueDay:1,
       createdMonth:currentYM(),paidAtCreation:0,totalInstallments:'',
@@ -107,7 +122,11 @@ function load(){
     const isEmptyDefault=String(income.name||'').trim()==='Nómina' && String(income.amount??'').trim()==='';
     return !isEmptyDefault;
   });
-  if(state.incomes.length!==incomeCountBeforeCleanup) save();
+  const fixedNeedsMigration=(state.fixed||[]).some(expense=>!expense.frequency || expense.nextChargeMonth===undefined);
+  state.fixed=(state.fixed||[]).map(normalizeFixedExpense);
+  const versionNeedsMigration=state.version!==3;
+  state.version=3;
+  if(state.incomes.length!==incomeCountBeforeCleanup || fixedNeedsMigration || versionNeedsMigration) save();
 }
 function save(){
   localStorage.setItem(APP_KEY,JSON.stringify(state));
@@ -117,7 +136,24 @@ function recurringIncome(ym=currentYM()){
   return state.incomes.filter(x=>x.active!==false).reduce((a,x)=>a+num(x.amount),0);
 }
 function recurringFixed(ym=currentYM()){
-  return state.fixed.filter(x=>x.active!==false).reduce((a,x)=>a+num(x.amount),0);
+  return state.fixed.filter(x=>fixedActiveInMonth(x,ym)).reduce((a,x)=>a+num(x.amount),0);
+}
+function fixedActiveInMonth(expense,ym=currentYM()){
+  if(expense.active===false) return false;
+  const frequency=fixedFrequencyInfo(expense.frequency);
+  if(frequency.value==='monthly') return true;
+  const firstCharge=expense.nextChargeMonth;
+  if(!firstCharge || ym<firstCharge) return false;
+  return monthDiff(firstCharge,ym)%frequency.months===0;
+}
+function nextFixedChargeMonth(expense,fromYM=currentYM()){
+  const frequency=fixedFrequencyInfo(expense.frequency);
+  if(frequency.value==='monthly') return fromYM;
+  const firstCharge=expense.nextChargeMonth;
+  if(!firstCharge) return '';
+  if(fromYM<=firstCharge) return firstCharge;
+  const elapsed=monthDiff(firstCharge,fromYM);
+  return addMonths(firstCharge,Math.ceil(elapsed/frequency.months)*frequency.months);
 }
 function financeEndMonth(f){
   if(f.endMonth) return f.endMonth;
@@ -279,21 +315,27 @@ function renderAllocation(c){
     <div class="allocation-row"><i class="dot" style="background:${color}"></i><span>${esc(n)}</span><strong>${eur(v)}</strong></div>
   `).join('');
 }
-function upcomingItems(){
+function upcomingItems(includeFuturePeriodic=false){
   const ym=currentYM(), today=todayDay();
   const rows=[];
-  state.fixed.filter(x=>x.active!==false).forEach(x=>rows.push({name:x.name||'Gasto fijo',amount:num(x.amount),day:clamp(parseInt(x.day)||1,1,31),type:'Fijo'}));
-  state.finances.filter(x=>financeActiveInMonth(x,ym)).forEach(x=>rows.push({name:x.name||'Financiación',amount:num(x.monthlyAmount),day:clamp(parseInt(x.dueDay)||1,1,31),type:'Cuota'}));
+  state.fixed.filter(x=>x.active!==false).forEach(x=>{
+    const frequency=fixedFrequencyInfo(x.frequency);
+    const chargeYM=fixedActiveInMonth(x,ym)?ym:(includeFuturePeriodic && frequency.value!=='monthly'?nextFixedChargeMonth(x,ym):'');
+    if(chargeYM) rows.push({name:x.name||'Gasto fijo',amount:num(x.amount),day:clamp(parseInt(x.day)||1,1,31),type:frequency.label,ym:chargeYM});
+  });
+  state.finances.filter(x=>financeActiveInMonth(x,ym)).forEach(x=>rows.push({name:x.name||'Financiación',amount:num(x.monthlyAmount),day:clamp(parseInt(x.dueDay)||1,1,31),type:'Cuota',ym}));
   return rows.sort((a,b)=>{
-    const aa=a.day>=today?a.day:a.day+40, bb=b.day>=today?b.day:b.day+40;
+    const aa=monthDiff(ym,a.ym)*40+(a.ym===ym && a.day<today?a.day+40:a.day);
+    const bb=monthDiff(ym,b.ym)*40+(b.ym===ym && b.day<today?b.day+40:b.day);
     return aa-bb;
   });
 }
 function renderUpcoming(){
-  const rows=upcomingItems().slice(0,5);
+  const current=currentYM();
+  const rows=upcomingItems(true).slice(0,5);
   document.getElementById('upcomingPayments').innerHTML=rows.length?rows.map(x=>`
     <div class="list-item">
-      <div class="list-main"><div class="list-title">${esc(x.name)}</div><div class="list-meta">Día ${x.day} · ${x.type}</div></div>
+      <div class="list-main"><div class="list-title">${esc(x.name)}</div><div class="list-meta">${x.ym===current?`Día ${x.day}`:`${monthName(x.ym)} · día ${x.day}`} · ${x.type}</div></div>
       <div class="list-amount">${eur(x.amount)}</div>
     </div>`).join(''):'<div class="empty">No hay pagos recurrentes registrados.</div>';
 }
@@ -318,7 +360,7 @@ function renderMovements(){
   const incomes=document.getElementById('incomeList');
   incomes.innerHTML=state.incomes.length?state.incomes.map(x=>listEditable(x,'income')).join(''):'<div class="empty">No hay ingresos.</div>';
   const fixed=document.getElementById('fixedList');
-  fixed.innerHTML=state.fixed.length?state.fixed.map(x=>listEditable(x,'fixed')).join(''):'<div class="empty">No hay gastos fijos.</div>';
+  fixed.innerHTML=state.fixed.length?state.fixed.map(x=>listEditable(x,'fixed')).join(''):'<div class="empty">No hay gastos fijos o periódicos.</div>';
 
   const search=(document.getElementById('expenseSearch').value||'').toLowerCase();
   const cat=document.getElementById('expenseCategoryFilter').value||'';
@@ -340,7 +382,12 @@ function renderMovements(){
   renderCategoryBudgets();
 }
 function listEditable(x,type){
-  const meta=type==='income'?`Día ${x.day||1}`:`${esc(x.category||'Sin categoría')} · Día ${x.day||1}`;
+  let meta=`Día ${x.day||1}`;
+  if(type==='fixed'){
+    const frequency=fixedFrequencyInfo(x.frequency);
+    const nextCharge=nextFixedChargeMonth(x);
+    meta=`${esc(x.category||'Sin categoría')} · ${frequency.label}${frequency.value==='monthly'?'':` · Próximo cobro: ${nextCharge?monthName(nextCharge):'sin definir'}`} · Día ${x.day||1}`;
+  }
   const amount=type==='income'?num(x.amount):-num(x.amount);
   return `<div class="list-item">
     <div class="list-main"><div class="list-title">${esc(x.name|| (type==='income'?'Ingreso':'Gasto fijo'))}</div><div class="list-meta">${meta}${x.active===false?' · Inactivo':''}</div></div>
@@ -519,7 +566,7 @@ function openModal(type,id=null){
   const submitText=editing?'Guardar cambios':'Añadir';
   title.textContent={
     income:editing?'Editar ingreso':'Nuevo ingreso',
-    fixed:editing?'Editar gasto fijo':'Nuevo gasto fijo',
+    fixed:editing?'Editar gasto fijo o periódico':'Nuevo gasto fijo o periódico',
     variable:editing?'Editar gasto':'Nuevo gasto variable',
     finance:editing?'Editar financiación':'Nueva financiación',
     categoryBudget:editing?'Editar presupuesto':'Presupuesto por categoría',
@@ -535,13 +582,32 @@ function openModal(type,id=null){
     `,submitText,type,id);
   }
   if(type==='fixed'){
-    item=item||{name:'',amount:'',day:1,category:'Hogar',active:true};
+    item=normalizeFixedExpense(item||{name:'',amount:'',day:1,category:'Hogar',frequency:'monthly',nextChargeMonth:'',active:true});
     form.innerHTML=formWrap(`
       ${field('Nombre','name',item.name,'Ej. Alquiler')}
-      <div class="form-grid">${field('Importe mensual','amount',item.amount,'0','decimal')}${field('Día de pago','day',item.day,'1','numeric')}</div>
+      <div class="form-grid">${field('Importe por cobro','amount',item.amount,'0','decimal')}${field('Día de pago','day',item.day,'1','numeric')}</div>
+      <div class="form-grid">
+        ${fixedFrequencyField(item.frequency)}
+        <div class="field" id="fixedNextChargeWrap">
+          <label for="field-nextChargeMonth">Mes del próximo cobro</label>
+          <input id="field-nextChargeMonth" type="month" name="nextChargeMonth" value="${esc(item.nextChargeMonth||currentYM())}">
+        </div>
+      </div>
       ${selectField('Categoría','category',item.category,defaultCategories)}
       ${checkbox('active','Activo',item.active!==false)}
+      <div class="info-box small">Los gastos mensuales se descuentan cada mes. Para el resto, el primer cobro se contabiliza en el mes indicado y la periodicidad se aplica a partir de ahí.</div>
     `,submitText,type,id);
+    const frequencySelect=form.querySelector('[name="frequency"]');
+    const nextChargeWrap=form.querySelector('#fixedNextChargeWrap');
+    const nextChargeInput=form.querySelector('[name="nextChargeMonth"]');
+    const syncFixedFrequency=()=>{
+      const isPeriodic=frequencySelect.value!=='monthly';
+      nextChargeWrap.hidden=!isPeriodic;
+      nextChargeInput.required=isPeriodic;
+      if(isPeriodic && !nextChargeInput.value) nextChargeInput.value=currentYM();
+    };
+    frequencySelect.addEventListener('change',syncFixedFrequency);
+    syncFixedFrequency();
   }
   if(type==='variable'){
     item=item||{name:'',amount:'',date:new Date().toISOString().slice(0,10),category:'Supermercado',notes:''};
@@ -558,7 +624,7 @@ function openModal(type,id=null){
       ${field('Producto / financiación','name',item.name,'Ej. iPhone')}
       <div class="form-grid">${field('Cuota mensual','monthlyAmount',item.monthlyAmount,'0','decimal')}${field('Día de cobro','dueDay',item.dueDay,'1','numeric')}</div>
       <div class="form-grid">${monthField('Mes desde el que la controlas','createdMonth',item.createdMonth)}${field('Cuotas ya pagadas','paidAtCreation',item.paidAtCreation,'0','numeric')}</div>
-      <div class="form-grid">${field('Número total de cuotas','totalInstallments',item.totalInstallments,'Ej. 24','numeric')}${monthField('O mes de última cuota','endMonth',item.endMonth)}</div>
+      <div class="form-grid">${field('Número total de cuotas','totalInstallments',item.totalInstallments,'Ej. 24','numeric')}${monthField('Mes de última cuota','endMonth',item.endMonth)}</div>
       ${field('Importe total financiado (opcional)','totalFinanced',item.totalFinanced,'Sirve para estimar capital pendiente','decimal')}
       ${textAreaField('Notas','notes',item.notes,'Ej. Sin intereses')}
       ${checkbox('active','Financiación activa',item.active!==false)}
@@ -603,6 +669,10 @@ function selectField(label,name,value,opts){
   const id=`field-${name}`;
   return `<div class="field"><label for="${id}">${esc(label)}</label><select id="${id}" name="${name}">${opts.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
 }
+function fixedFrequencyField(value='monthly'){
+  const id='field-frequency';
+  return `<div class="field"><label for="${id}">Periodicidad</label><select id="${id}" name="frequency">${fixedFrequencies.map(option=>`<option value="${option.value}" ${option.value===value?'selected':''}>${option.label}</option>`).join('')}</select></div>`;
+}
 function textAreaField(label,name,value,placeholder=''){
   const id=`field-${name}`;
   return `<div class="field"><label for="${id}">${esc(label)}</label><textarea id="${id}" name="${name}" placeholder="${esc(placeholder)}">${esc(value)}</textarea></div>`;
@@ -632,7 +702,12 @@ function handleFormSubmit(e){
   const obj=Object.fromEntries(fd.entries());
   e.currentTarget.querySelectorAll('input[type=checkbox]').forEach(cb=>obj[cb.name]=cb.checked);
   if(type==='income') obj.day=clamp(parseInt(obj.day)||1,1,31);
-  if(type==='fixed') obj.day=clamp(parseInt(obj.day)||1,1,31);
+  if(type==='fixed'){
+    obj.day=clamp(parseInt(obj.day)||1,1,31);
+    obj.frequency=fixedFrequencyInfo(obj.frequency).value;
+    if(obj.frequency==='monthly') obj.nextChargeMonth='';
+    else if(!obj.nextChargeMonth){toast('Indica el mes del próximo cobro');return;}
+  }
   if(type==='finance'){
     obj.dueDay=clamp(parseInt(obj.dueDay)||1,1,31);
     obj.paidAtCreation=Math.max(0,parseInt(obj.paidAtCreation)||0);
@@ -658,7 +733,7 @@ function closeCurrentMonth(){
 }
 function exportData(){
   state.settings.lastBackup=nowISO();save();renderMore();
-  const payload={app:'MyMoney',version:2,exportedAt:nowISO(),data:state};
+  const payload={app:'MyMoney',version:3,exportedAt:nowISO(),data:state};
   downloadBlob(JSON.stringify(payload,null,2),`mymoney-copia-${new Date().toISOString().slice(0,10)}.json`,'application/json');
   toast('Copia exportada');
 }
@@ -678,7 +753,7 @@ function normalizeImportedData(data){
     (Array.isArray(data.finances) && data.finances.some(f=>'amount' in f && !('monthlyAmount' in f))) ||
     (Array.isArray(data.variables) && data.variables.some(v=>'month' in v && !('date' in v)));
 
-  if(!looksLikeV1) return data;
+  if(!looksLikeV1) return {...data,version:3,fixed:(data.fixed||[]).map(normalizeFixedExpense)};
 
   const fresh=baseState();
   fresh.incomes=(data.incomes||[]).map(x=>({
@@ -686,8 +761,8 @@ function normalizeImportedData(data){
   }));
   fresh.fixed=(data.fixed||[]).map(x=>({
     id:x.id||uid('fix'),name:x.name||'Gasto fijo',amount:x.amount||'',day:x.day||1,
-    category:x.category||'Hogar',active:x.active!==false
-  }));
+    category:x.category||'Hogar',frequency:x.frequency||'monthly',nextChargeMonth:x.nextChargeMonth||'',active:x.active!==false
+  })).map(normalizeFixedExpense);
   fresh.finances=(data.finances||[]).map(x=>({
     id:x.id||uid('fin'),name:x.name||'Financiación',
     monthlyAmount:x.monthlyAmount??x.amount??'',dueDay:x.dueDay||1,
@@ -715,6 +790,8 @@ function importData(file){
       const data=normalizeImportedData(raw);
       if(!Array.isArray(data.variables)) data.variables=[];
       state={...baseState(),...data};
+      state.version=3;
+      state.fixed=(state.fixed||[]).map(normalizeFixedExpense);
       state.settings={...baseState().settings,...data.settings};
       save();renderAll();toast('Copia importada correctamente');
     }catch(e){ alert('No se pudo importar el archivo. Comprueba que sea una copia válida de MyMoney.'); }
