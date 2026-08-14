@@ -1,6 +1,6 @@
 
-const CACHE='mymoney-v3-1-0';
-const FILES=['./','./index.html','./app.css?v=3.1.0','./app.js?v=3.1.0','./manifest.json','./icon-192.png','./icon-512.png'];
+const CACHE='mymoney-v3-1-1';
+const FILES=['./','./index.html','./app.css?v=3.1.1','./app.js?v=3.1.1','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));
 });

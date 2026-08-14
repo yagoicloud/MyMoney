@@ -66,7 +66,7 @@ py -m http.server 8000 --bind 0.0.0.0
 
 Después abre `http://localhost:8000`. MyMoney desactiva automáticamente el Service Worker y elimina únicamente sus cachés cuando se ejecuta en `localhost`, `127.0.0.1` o `0.0.0.0`. Así, los cambios aparecen al recargar sin borrar los datos guardados en `localStorage`.
 
-Si vienes de una versión anterior que todavía controla el navegador, abre una vez `http://localhost:8000/?update=3.1.0`. Las URLs versionadas de los recursos fuerzan la carga del código actual y completan la limpieza automática.
+Si vienes de una versión anterior que todavía controla el navegador, abre una vez `http://localhost:8000/?update=3.1.1`. Las URLs versionadas de los recursos fuerzan la carga del código actual y completan la limpieza automática.
 
 En GitHub Pages el Service Worker continúa activo para mantener el funcionamiento offline.
 
@@ -112,3 +112,8 @@ En GitHub Pages el Service Worker continúa activo para mantener el funcionamien
 - Los gastos existentes y las copias antiguas se conservan como mensuales.
 - Simplificado el campo de financiación “O mes de última cuota” a “Mes de última cuota”.
 - Actualizada la versión de datos, recursos y caché a 3.1.0.
+
+## Corrección 3.1.1
+- Cambiado a azul neutro el aviso “Sin configurar” para no confundirlo con un presupuesto saludable.
+- Sustituidos los iconos de instalación de 192 y 512 píxeles por la nueva identidad visual de MyMoney.
+- Actualizada la caché offline para que Safari descargue los nuevos recursos.

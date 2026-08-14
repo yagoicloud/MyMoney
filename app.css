@@ -49,6 +49,7 @@ main{max-width:840px;margin:0 auto;padding:10px 14px 28px}
 .status-danger{color:var(--red)}
 .status-neutral{color:#a9c9f7}
 .hero-guidance{margin:8px 0 13px;padding:10px 11px;border-radius:12px;font-size:12px;line-height:1.45;border-left:3px solid var(--green);background:rgba(69,229,139,.08);color:#d9fae6}
+.hero-guidance.neutral{border-color:#63a8ff;background:rgba(99,168,255,.08);color:#d9eaff}
 .hero-guidance.warn{border-color:var(--yellow);background:rgba(251,191,36,.08);color:#fde9a7}
 .hero-guidance.bad{border-color:var(--red);background:rgba(251,113,133,.08);color:#ffd0d8}
 .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}

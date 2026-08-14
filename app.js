@@ -244,7 +244,7 @@ function renderHome(){
     level='warning';statusClass='status-warning';statusText='Margen ajustado';alertClass='warn';
     message=`Margen bajo: te quedan ${eur(c.available)}. Conviene frenar gastos no esenciales.`;
   }else if(c.income===0 && c.committed===0 && c.variable===0){
-    statusClass='status-neutral';statusText='Sin configurar';
+    statusClass='status-neutral';statusText='Sin configurar';alertClass='neutral';
     message='Añade tus ingresos y gastos para empezar.';
   }else{
     message=`Con los datos actuales, puedes gastar hasta ${eur(c.available)} sin terminar el mes en negativo.`;
