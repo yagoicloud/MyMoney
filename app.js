@@ -25,7 +25,10 @@ function monthName(ym, short=false){
 function num(v){
   if(typeof v === 'number') return Number.isFinite(v)?v:0;
   if(v===null || v===undefined || v==='') return 0;
-  const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.'));
+  let normalized=String(v).trim().replace(/\s/g,'').replace(/[^0-9,.-]/g,'');
+  if(normalized.includes(',')) normalized=normalized.replace(/\./g,'').replace(',','.');
+  else if((normalized.match(/\./g)||[]).length>1) normalized=normalized.replace(/\./g,'');
+  const n=parseFloat(normalized);
   return Number.isFinite(n)?n:0;
 }
 function eur(v){
@@ -47,7 +50,7 @@ function baseState(){
   return {
     version:2,
     createdAt:nowISO(),
-    incomes:[{id:uid('inc'),name:'Nómina',amount:'',day:1,active:true}],
+    incomes:[],
     fixed:[],
     finances:[],
     variables:[],
@@ -59,6 +62,7 @@ function baseState(){
       expectedVariable:'',
       warningThreshold:'0.15',
       budgetStartDay:'1',
+      setupDismissed:false,
       lastBackup:null
     }
   };
@@ -98,6 +102,12 @@ function load(){
       migrateOld();
     }
   }catch(e){ state=baseState(); }
+  const incomeCountBeforeCleanup=(state.incomes||[]).length;
+  state.incomes=(state.incomes||[]).filter(income=>{
+    const isEmptyDefault=String(income.name||'').trim()==='Nómina' && String(income.amount??'').trim()==='';
+    return !isEmptyDefault;
+  });
+  if(state.incomes.length!==incomeCountBeforeCleanup) save();
 }
 function save(){
   localStorage.setItem(APP_KEY,JSON.stringify(state));
@@ -190,44 +200,65 @@ function renderHome(){
   const safe=document.getElementById('safeToSpend');
   safe.textContent=eur(c.available);
   const threshold=c.income*num(state.settings.warningThreshold||0.15);
-  let level='positive', traffic='green', alertClass='ok', message='';
+  let level='positive', statusClass='status-good', statusText='Buen margen', alertClass='ok', message='';
   if(c.available<0){
-    level='negative';traffic='red';alertClass='bad';
+    level='negative';statusClass='status-danger';statusText='En negativo';alertClass='bad';
     message=`Vas ${eur(Math.abs(c.available))} por encima de lo que puedes permitirte este mes.`;
   }else if(c.income>0 && c.available<=threshold){
-    level='warning';traffic='yellow';alertClass='warn';
+    level='warning';statusClass='status-warning';statusText='Margen ajustado';alertClass='warn';
     message=`Margen bajo: te quedan ${eur(c.available)}. Conviene frenar gastos no esenciales.`;
   }else if(c.income===0 && c.committed===0 && c.variable===0){
+    statusClass='status-neutral';statusText='Sin configurar';
     message='Añade tus ingresos y gastos para empezar.';
   }else{
     message=`Con los datos actuales, puedes gastar hasta ${eur(c.available)} sin terminar el mes en negativo.`;
   }
   safe.className=`hero-amount ${level}`;
-  document.getElementById('trafficLight').className=`traffic ${traffic}`;
+  document.getElementById('budgetStatus').className=`status-pill ${statusClass}`;
+  document.getElementById('budgetStatusText').textContent=statusText;
   const alert=document.getElementById('mainAlert');
-  alert.className=`alert ${alertClass}`; alert.textContent=message;
+  alert.className=`hero-guidance ${alertClass}`; alert.textContent=message;
 
   const day=Math.max(0,c.available)/remainingDays();
   document.getElementById('perDay').textContent=eur(day);
   document.getElementById('perWeek').textContent=eur(day*7);
   const d=new Date();
   const elapsed=d.getDate()/new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
-  document.getElementById('monthProgress').style.width=`${Math.round(elapsed*100)}%`;
+  const elapsedPct=Math.round(elapsed*100);
+  document.getElementById('monthProgress').style.width=`${elapsedPct}%`;
+  document.getElementById('monthProgress').setAttribute('aria-valuenow',String(elapsedPct));
+  document.getElementById('monthProgressLabel').textContent=`${elapsedPct}%`;
+
+  const assigned=c.committed+c.variable;
+  const assignedPct=c.income>0?assigned/c.income*100:(assigned>0?100:0);
+  const budgetProgress=document.getElementById('budgetProgress');
+  budgetProgress.style.width=`${clamp(assignedPct,0,100)}%`;
+  budgetProgress.setAttribute('aria-valuenow',String(Math.round(clamp(assignedPct,0,100))));
+  budgetProgress.className=`progress-fill budget ${assignedPct>100?'danger':assignedPct>=85?'warning':''}`.trim();
+  document.getElementById('budgetProgressLabel').textContent=c.income>0?`${Math.round(assignedPct)}%`:'0%';
 
   document.getElementById('kpiIncome').textContent=eur(c.income);
   document.getElementById('kpiCommitted').textContent=eur(c.committed);
   document.getElementById('kpiVariable').textContent=eur(c.variable);
   document.getElementById('kpiSavings').textContent=eur(c.savings+c.reserve);
-  document.getElementById('sumFixed').textContent=eur(c.fixed);
-  document.getElementById('sumFinance').textContent=eur(c.finance);
-  document.getElementById('sumSavings').textContent=eur(c.savings);
-  document.getElementById('sumReserve').textContent=eur(c.reserve);
-  document.getElementById('commitmentPct').textContent=`${c.income?Math.round(c.committed/c.income*100):0}% comprometido`;
-  renderDonut(c);
+  document.getElementById('commitmentPct').textContent=c.income>0?`${Math.round(c.committed/c.income*100)}% reservado`:'Sin ingresos';
+  const setupDone={
+    income:c.income>0,
+    fixed:state.fixed.some(x=>x.active!==false && num(x.amount)>0),
+    finance:state.finances.some(x=>x.active!==false && num(x.monthlyAmount)>0)
+  };
+  const setupGuide=document.getElementById('setupGuide');
+  setupGuide.hidden=state.settings.setupDismissed || Object.values(setupDone).every(Boolean);
+  setupGuide.querySelectorAll('[data-open-modal]').forEach((button,index)=>{
+    const done=setupDone[button.dataset.openModal];
+    button.classList.toggle('done',done);
+    button.querySelector('span').textContent=done?'✓':String(index+1);
+  });
+  renderAllocation(c);
   renderUpcoming();
   renderSmartAlerts(c);
 }
-function renderDonut(c){
+function renderAllocation(c){
   const total=Math.max(c.income,c.fixed+c.finance+c.savings+c.reserve+c.variable,1);
   const pieces=[
     ['Fijos',c.fixed,'var(--blue)'],
@@ -236,18 +267,16 @@ function renderDonut(c){
     ['Ahorro + colchón',c.savings+c.reserve,'var(--cyan)'],
     ['Libre',Math.max(0,c.available),'var(--green)']
   ];
-  let start=0, stops=[];
-  pieces.forEach(([n,v,color])=>{
-    const deg=(v/total)*360;
-    stops.push(`${color} ${start}deg ${start+deg}deg`);
-    start+=deg;
-  });
-  if(start<360) stops.push(`#24324d ${start}deg 360deg`);
-  document.getElementById('budgetDonut').style.background=`conic-gradient(${stops.join(',')})`;
-  const freePct=c.income>0?Math.max(0,c.available/c.income):0;
-  document.getElementById('donutFree').textContent=pct(freePct);
-  document.getElementById('donutLegend').innerHTML=pieces.map(([n,v,color])=>`
-    <div class="legend-row"><span class="legend-left"><i class="dot" style="background:${color}"></i>${esc(n)}</span><strong>${eur(v)}</strong></div>
+  const stack=document.getElementById('budgetStack');
+  stack.innerHTML=pieces.some(([,v])=>v>0)
+    ? pieces.filter(([,v])=>v>0).map(([n,v,color])=>`<span class="budget-segment" title="${esc(n)}: ${eur(v)}" style="width:${v/total*100}%;background:${color}"></span>`).join('')
+    : '<span class="budget-segment" style="width:100%;background:#2a3952"></span>';
+  stack.setAttribute('aria-label',pieces.map(([n,v])=>`${n}: ${eur(v)}`).join('. '));
+  const free=document.getElementById('allocationFree');
+  free.textContent=eur(c.available);
+  free.className=c.available<0?'negative':c.income>0 && c.available<=c.income*num(state.settings.warningThreshold||0.15)?'warning':'positive';
+  document.getElementById('budgetLegend').innerHTML=pieces.map(([n,v,color])=>`
+    <div class="allocation-row"><i class="dot" style="background:${color}"></i><span>${esc(n)}</span><strong>${eur(v)}</strong></div>
   `).join('');
 }
 function upcomingItems(){
@@ -302,8 +331,8 @@ function renderMovements(){
       </div>
       <div class="list-amount">${eur(v.amount)}</div>
       <div class="item-actions">
-        <button class="mini-btn" onclick="editEntity('variable','${v.id}')">Editar</button>
-        <button class="mini-btn delete" onclick="deleteEntity('variable','${v.id}')">✕</button>
+        <button class="mini-btn" aria-label="Editar ${esc(v.name||'gasto')}" onclick="editEntity('variable','${v.id}')">Editar</button>
+        <button class="mini-btn delete" aria-label="Eliminar ${esc(v.name||'gasto')}" onclick="deleteEntity('variable','${v.id}')">✕</button>
       </div>
     </div>`).join(''):'<div class="empty">No hay gastos que coincidan con el filtro.</div>';
   document.getElementById('variableTotalFooter').textContent=eur(variableSpent());
@@ -317,8 +346,8 @@ function listEditable(x,type){
     <div class="list-main"><div class="list-title">${esc(x.name|| (type==='income'?'Ingreso':'Gasto fijo'))}</div><div class="list-meta">${meta}${x.active===false?' · Inactivo':''}</div></div>
     <div class="list-amount">${type==='income'?'+':''}${eur(amount)}</div>
     <div class="item-actions">
-      <button class="mini-btn" onclick="editEntity('${type}','${x.id}')">Editar</button>
-      <button class="mini-btn delete" onclick="deleteEntity('${type}','${x.id}')">✕</button>
+      <button class="mini-btn" aria-label="Editar ${esc(x.name||'registro')}" onclick="editEntity('${type}','${x.id}')">Editar</button>
+      <button class="mini-btn delete" aria-label="Eliminar ${esc(x.name||'registro')}" onclick="deleteEntity('${type}','${x.id}')">✕</button>
     </div>
   </div>`;
 }
@@ -340,7 +369,7 @@ function renderCategoryBudgets(){
   el.innerHTML=state.categoryBudgets.map(b=>{
     const spent=categorySpent(b.category), lim=num(b.limit), ratio=lim?spent/lim:0;
     return `<div class="budget-row">
-      <div class="budget-head"><span>${esc(b.category)}</span><span>${eur(spent)} / ${eur(lim)} <button class="mini-btn" onclick="editEntity('categoryBudget','${b.id}')">Editar</button></span></div>
+      <div class="budget-head"><span>${esc(b.category)}</span><span>${eur(spent)} / ${eur(lim)} <button class="mini-btn" aria-label="Editar límite de ${esc(b.category)}" onclick="editEntity('categoryBudget','${b.id}')">Editar</button> <button class="mini-btn delete" aria-label="Eliminar límite de ${esc(b.category)}" onclick="deleteEntity('categoryBudget','${b.id}')">✕</button></span></div>
       <div class="budget-track"><div class="budget-fill ${ratio>=1?'over':ratio>=.8?'warn':''}" style="width:${clamp(ratio*100,0,100)}%"></div></div>
     </div>`;
   }).join('');
@@ -371,7 +400,7 @@ function renderFinancing(){
       </div>
       <div class="finance-foot" style="margin-top:7px">
         <span>Pendiente aprox.: ${eur(financingRemainingAmount(f))}</span>
-        <span><button class="mini-btn" onclick="editEntity('finance','${f.id}')">Editar</button> <button class="mini-btn delete" onclick="deleteEntity('finance','${f.id}')">✕</button></span>
+        <span><button class="mini-btn" aria-label="Editar ${esc(f.name||'financiación')}" onclick="editEntity('finance','${f.id}')">Editar</button> <button class="mini-btn delete" aria-label="Eliminar ${esc(f.name||'financiación')}" onclick="deleteEntity('finance','${f.id}')">✕</button></span>
       </div>
     </div>`;
   }).join(''):'<div class="empty">No tienes financiaciones activas.</div>';
@@ -431,7 +460,7 @@ function renderGoals(){
     return `<div class="goal">
       <div class="goal-top"><div><div class="goal-name">${esc(g.name||'Objetivo')}</div><div class="list-meta">${g.deadline?`Objetivo: ${monthName(g.deadline)}`:'Sin fecha límite'} · ${g.includeInBudget===false?'No descuenta del presupuesto':'Reserva mensual incluida'}</div></div><strong>${eur(cur)} / ${eur(tar)}</strong></div>
       <div class="goal-progress"><div class="budget-track"><div class="budget-fill" style="width:${clamp(ratio*100,0,100)}%"></div></div></div>
-      <div class="finance-foot" style="margin-top:8px"><span>Aporte mensual: ${eur(g.monthlyContribution)}</span><span><button class="mini-btn" onclick="editEntity('goal','${g.id}')">Editar</button> <button class="mini-btn delete" onclick="deleteEntity('goal','${g.id}')">✕</button></span></div>
+      <div class="finance-foot" style="margin-top:8px"><span>Aporte mensual: ${eur(g.monthlyContribution)}</span><span><button class="mini-btn" aria-label="Editar ${esc(g.name||'objetivo')}" onclick="editEntity('goal','${g.id}')">Editar</button> <button class="mini-btn delete" aria-label="Eliminar ${esc(g.name||'objetivo')}" onclick="deleteEntity('goal','${g.id}')">✕</button></span></div>
     </div>`;
   }).join('');
 }
@@ -440,17 +469,31 @@ function renderSimulator(){
   const mode=document.getElementById('simMode').value;
   document.getElementById('simMonthsWrap').hidden=mode!=='finance';
   const out=document.getElementById('simResult');
-  if(price<=0){out.textContent='Introduce un precio para simular.';return;}
+  if(price<=0){out.className='sim-result neutral';out.textContent='Introduce un precio para simular.';return;}
   const c=calcMonth();
   if(mode==='cash'){
     const after=c.available-price;
-    out.innerHTML=after>=0?`Podrías pagarlo al contado y todavía te quedarían <strong>${eur(after)}</strong> este mes.`:`Al pagarlo al contado, terminarías el mes aproximadamente <strong>${eur(Math.abs(after))}</strong> en negativo.`;
+    const threshold=c.income*num(state.settings.warningThreshold||0.15);
+    if(after<0){out.className='sim-result bad';out.innerHTML=`<strong>No encaja este mes.</strong> Al pagarlo al contado, terminarías aproximadamente <strong>${eur(Math.abs(after))}</strong> en negativo.`;}
+    else if(c.income>0 && after<=threshold){out.className='sim-result warn';out.innerHTML=`<strong>Encaja, pero te deja muy justo.</strong> Después de pagarlo te quedarían <strong>${eur(after)}</strong> este mes.`;}
+    else{out.className='sim-result good';out.innerHTML=`<strong>Parece asumible este mes.</strong> Después de pagarlo todavía te quedarían <strong>${eur(after)}</strong>.`;}
   }else{
     const months=Math.max(1,parseInt(document.getElementById('simMonths').value)||1);
     const quota=price/months;
     const future=c.available-quota;
-    const pctIncome=c.income?quota/c.income:0;
-    out.innerHTML=`Cuota aproximada: <strong>${eur(quota)}/mes</strong>. Tu margen mensual bajaría a <strong>${eur(future)}</strong>${pctIncome>.1?` y esta nueva cuota consumiría un ${Math.round(pctIncome*100)}% adicional de tus ingresos.`:'.'}`;
+    const totalFinance=c.finance+quota;
+    const totalFinancePct=c.income?totalFinance/c.income:0;
+    const threshold=c.income*num(state.settings.warningThreshold||0.15);
+    const verdict=future<0
+      ? '<strong>No parece asumible:</strong> la nueva cuota dejaría tu margen mensual en negativo.'
+      : c.income>0 && (future<=threshold || totalFinancePct>=.40)
+        ? '<strong>Quedaría muy justo:</strong> revisa si puedes reducir el precio o el resto de cuotas.'
+        : '<strong>La cuota parece encajar:</strong> conservarías margen mensual con los datos actuales.';
+    const financeShare=c.income>0
+      ? `Todas tus financiaciones supondrían aproximadamente el <strong>${Math.round(totalFinancePct*100)}%</strong> de tus ingresos.`
+      : 'Añade tus ingresos mensuales para poder calcular qué porcentaje consumirían las cuotas.';
+    out.className=`sim-result ${future<0?'bad':c.income>0 && (future<=threshold || totalFinancePct>=.40)?'warn':'good'}`;
+    out.innerHTML=`${verdict}<br><br>Cuota estimada sin intereses: <strong>${eur(quota)}/mes</strong>. Margen mensual resultante: <strong>${eur(future)}</strong>. ${financeShare}`;
   }
 }
 
@@ -545,19 +588,24 @@ function openModal(type,id=null){
   setTimeout(()=>form.querySelector('input,select,textarea')?.focus(),50);
 }
 function field(label,name,value='',placeholder='',mode='text'){
-  return `<div class="field"><label>${esc(label)}</label><input name="${name}" value="${esc(value)}" placeholder="${esc(placeholder)}" inputmode="${mode}"></div>`;
+  const id=`field-${name}`;
+  return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" name="${name}" value="${esc(value)}" placeholder="${esc(placeholder)}" inputmode="${mode}"></div>`;
 }
 function dateField(label,name,value=''){
-  return `<div class="field"><label>${esc(label)}</label><input type="date" name="${name}" value="${esc(value)}"></div>`;
+  const id=`field-${name}`;
+  return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" type="date" name="${name}" value="${esc(value)}"></div>`;
 }
 function monthField(label,name,value=''){
-  return `<div class="field"><label>${esc(label)}</label><input type="month" name="${name}" value="${esc(value)}"></div>`;
+  const id=`field-${name}`;
+  return `<div class="field"><label for="${id}">${esc(label)}</label><input id="${id}" type="month" name="${name}" value="${esc(value)}"></div>`;
 }
 function selectField(label,name,value,opts){
-  return `<div class="field"><label>${esc(label)}</label><select name="${name}">${opts.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+  const id=`field-${name}`;
+  return `<div class="field"><label for="${id}">${esc(label)}</label><select id="${id}" name="${name}">${opts.map(o=>`<option value="${esc(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
 }
 function textAreaField(label,name,value,placeholder=''){
-  return `<div class="field"><label>${esc(label)}</label><textarea name="${name}" placeholder="${esc(placeholder)}">${esc(value)}</textarea></div>`;
+  const id=`field-${name}`;
+  return `<div class="field"><label for="${id}">${esc(label)}</label><textarea id="${id}" name="${name}" placeholder="${esc(placeholder)}">${esc(value)}</textarea></div>`;
 }
 function checkbox(name,label,checked){
   return `<label class="field" style="grid-template-columns:auto 1fr;align-items:center"><input type="checkbox" name="${name}" ${checked?'checked':''} style="width:auto"><span>${esc(label)}</span></label>`;
@@ -610,8 +658,8 @@ function closeCurrentMonth(){
 }
 function exportData(){
   state.settings.lastBackup=nowISO();save();renderMore();
-  const payload={app:'Mi Presupuesto',version:2,exportedAt:nowISO(),data:state};
-  downloadBlob(JSON.stringify(payload,null,2),`mi-presupuesto-copia-${new Date().toISOString().slice(0,10)}.json`,'application/json');
+  const payload={app:'MyMoney',version:2,exportedAt:nowISO(),data:state};
+  downloadBlob(JSON.stringify(payload,null,2),`mymoney-copia-${new Date().toISOString().slice(0,10)}.json`,'application/json');
   toast('Copia exportada');
 }
 function exportCSV(){
@@ -669,7 +717,7 @@ function importData(file){
       state={...baseState(),...data};
       state.settings={...baseState().settings,...data.settings};
       save();renderAll();toast('Copia importada correctamente');
-    }catch(e){ alert('No se pudo importar el archivo. Comprueba que sea una copia válida de Mi Presupuesto.'); }
+    }catch(e){ alert('No se pudo importar el archivo. Comprueba que sea una copia válida de MyMoney.'); }
   };
   r.readAsText(file);
 }
@@ -684,16 +732,26 @@ function toast(msg){
 }
 function navigate(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    const active=b.dataset.view===view;
+    b.classList.toggle('active',active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
   document.getElementById(`view-${view}`).classList.add('active');
   window.scrollTo({top:0,behavior:'smooth'});
   if(view==='planning') renderPlanning();
 }
+function openSimulator(){
+  navigate('planning');
+  setTimeout(()=>document.getElementById('simPrice').focus(),180);
+}
 function bind(){
   document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.go)));
-  document.getElementById('quickAddBtn').addEventListener('click',()=>openModal('variable'));
-  document.getElementById('addVariableBtn').addEventListener('click',()=>openModal('variable'));
+  document.querySelectorAll('[data-open-modal]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.openModal)));
+  document.getElementById('heroAddExpenseBtn').addEventListener('click',()=>openModal('variable'));
+  document.getElementById('heroSimulatorBtn').addEventListener('click',openSimulator);
+  document.getElementById('dismissSetupBtn').addEventListener('click',()=>{state.settings.setupDismissed=true;save();renderHome();});
   document.getElementById('addVariableLink').addEventListener('click',()=>openModal('variable'));
   document.getElementById('addIncomeBtn').addEventListener('click',()=>openModal('income'));
   document.getElementById('addFixedBtn').addEventListener('click',()=>openModal('fixed'));
@@ -722,6 +780,38 @@ load();
 bind();
 renderAll();
 
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').then(()=>document.getElementById('offlineStatus').textContent='Disponible').catch(()=>document.getElementById('offlineStatus').textContent='No activo'));
-}
+const LOCAL_HOSTS=new Set(['localhost','127.0.0.1','0.0.0.0','::1','[::1]']);
+
+window.addEventListener('load',async()=>{
+  const offlineStatus=document.getElementById('offlineStatus');
+
+  if(!('serviceWorker' in navigator)){
+    offlineStatus.textContent='No activo';
+    return;
+  }
+
+  if(LOCAL_HOSTS.has(location.hostname)){
+    try{
+      const registrations=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration=>registration.unregister()));
+
+      if('caches' in window){
+        const cacheNames=await caches.keys();
+        const myMoneyCaches=cacheNames.filter(name=>name.startsWith('mymoney-') || name.startsWith('mi-presupuesto-'));
+        await Promise.all(myMoneyCaches.map(name=>caches.delete(name)));
+      }
+
+      offlineStatus.textContent='Desactivado en local';
+    }catch(error){
+      offlineStatus.textContent='No activo en local';
+    }
+    return;
+  }
+
+  try{
+    await navigator.serviceWorker.register('./sw.js');
+    offlineStatus.textContent='Disponible';
+  }catch(error){
+    offlineStatus.textContent='No activo';
+  }
+});

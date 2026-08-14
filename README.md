@@ -1,4 +1,4 @@
-# MyMoney - versión 2.2 corregida
+# MyMoney - versión 3.0
 
 Aplicación web instalable (PWA) para iPhone orientada a responder una pregunta principal:
 
@@ -56,6 +56,20 @@ La web puede estar alojada públicamente, pero los datos financieros que introdu
 
 Haz copias de seguridad periódicas desde Más > Exportar copia.
 
+## Pruebas locales
+
+Ejecuta la app desde esta carpeta con:
+
+```powershell
+py -m http.server 8000 --bind 0.0.0.0
+```
+
+Después abre `http://localhost:8000`. MyMoney desactiva automáticamente el Service Worker y elimina únicamente sus cachés cuando se ejecuta en `localhost`, `127.0.0.1` o `0.0.0.0`. Así, los cambios aparecen al recargar sin borrar los datos guardados en `localStorage`.
+
+Si vienes de una versión anterior que todavía controla el navegador, abre una vez `http://localhost:8000/?update=3.0.3`. Las URLs versionadas de los recursos fuerzan la carga del código actual y completan la limpieza automática.
+
+En GitHub Pages el Service Worker continúa activo para mantener el funcionamiento offline.
+
 
 ## Corrección 2.1
 - Corregido el panel modal “Añadir” que podía aparecer abierto y vacío al cargar la página.
@@ -65,3 +79,28 @@ Haz copias de seguridad periódicas desde Más > Exportar copia.
 - Sustituido el símbolo emoji de la pestaña Movimientos por un icono SVG vectorial.
 - El nuevo icono es monocromo, sin fondo y hereda el color activo/inactivo de la barra inferior.
 - Actualizada la caché para que Safari descargue el cambio.
+
+## Versión 2.3
+- Renombrada la app como MyMoney en la interfaz, instalación y copias de seguridad.
+- Unificados los cinco iconos de navegación con SVG del mismo tamaño y alineación.
+- Añadidos iconos más claros para financiaciones (tarjeta) y planificación (calendario).
+- Mejorado el simulador para valorar una compra o nueva cuota según el margen y la carga financiera actuales.
+- Mejorada la lectura de importes escritos con formato español.
+- Actualizada la caché para que Safari descargue los cambios.
+- Desactivado automáticamente el Service Worker durante las pruebas locales para evitar versiones antiguas en caché.
+
+## Versión 3.0
+- Rediseñada la pantalla de Inicio para priorizar el dinero disponible y explicar mejor el margen mensual.
+- Sustituido el semáforo aislado por estados de texto claros: buen margen, margen ajustado o en negativo.
+- Separados visualmente el progreso temporal del mes y el porcentaje de ingresos ya asignado.
+- Añadida una configuración inicial guiada para ingresos, gastos fijos y financiaciones.
+- Sustituido el gráfico circular por una barra apilada y un desglose más legible en iPhone.
+- Añadidos accesos directos para registrar gastos y simular compras o nuevas financiaciones.
+- Reorganizada Planificación para mostrar primero el simulador “¿Me lo puedo permitir?”.
+- Mejorados tamaños táctiles, contraste, jerarquía tipográfica, estados, formularios y navegación inferior.
+- Actualizada la caché offline y la versión de los recursos a 3.0.0.
+- Eliminado completamente el botón rápido `+`; cada pantalla utiliza únicamente sus acciones contextuales.
+- Eliminados los accesos duplicados para añadir gastos y abrir el simulador desde una misma área funcional.
+- Unificados los textos de creación con el verbo “Añadir”, sin símbolos ni términos inconsistentes.
+- Eliminada la fila vacía “Nómina” que se creaba por defecto y podía confundirse con un ingreso real.
+- Añadida la opción que faltaba para eliminar límites por categoría.

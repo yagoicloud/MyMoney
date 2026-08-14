@@ -3,64 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b1020">
+  <meta name="theme-color" content="#070b13">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Mi Presupuesto">
+  <meta name="apple-mobile-web-app-title" content="MyMoney">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="app.css">
-  <title>Mi Presupuesto</title>
+  <link rel="stylesheet" href="app.css?v=3.0.3">
+  <title>MyMoney</title>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <div>
         <div class="eyebrow" id="monthLabel">Este mes</div>
-        <h1>Mi Presupuesto</h1>
+        <h1>MyMoney</h1>
       </div>
-      <button class="icon-btn" id="quickAddBtn" aria-label="Añadir gasto">＋</button>
     </header>
 
     <main>
       <section id="view-home" class="view active">
-        <article class="hero card">
+        <article class="hero">
           <div class="hero-top">
             <div>
-              <div class="muted tiny">PUEDES GASTAR TODAVÍA ESTE MES</div>
+              <div class="hero-kicker">DISPONIBLE PARA GASTAR ESTE MES</div>
               <div id="safeToSpend" class="hero-amount positive">0,00 €</div>
             </div>
-            <div id="trafficLight" class="traffic green" title="Estado del presupuesto"></div>
+            <div id="budgetStatus" class="status-pill status-good" role="status">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span id="budgetStatusText">Buen margen</span>
+            </div>
           </div>
-          <div class="progress-shell"><div id="monthProgress" class="progress-fill"></div></div>
+
+          <div id="mainAlert" class="hero-guidance ok">Añade tus datos para empezar.</div>
+
           <div class="hero-grid">
-            <div><span class="muted">Por día restante</span><strong id="perDay">0,00 €</strong></div>
-            <div><span class="muted">Por semana restante</span><strong id="perWeek">0,00 €</strong></div>
+            <div><span>Ritmo diario disponible</span><strong id="perDay">0,00 €</strong></div>
+            <div><span>Ritmo semanal disponible</span><strong id="perWeek">0,00 €</strong></div>
           </div>
-          <div id="mainAlert" class="alert ok">Añade tus datos para empezar.</div>
+
+          <div class="hero-progress-grid">
+            <div class="progress-block">
+              <div class="progress-label"><span>Mes transcurrido</span><strong id="monthProgressLabel">0%</strong></div>
+              <div class="progress-shell"><div id="monthProgress" class="progress-fill time" role="progressbar" aria-label="Mes transcurrido" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+            </div>
+            <div class="progress-block">
+              <div class="progress-label"><span>Ingresos ya asignados</span><strong id="budgetProgressLabel">0%</strong></div>
+              <div class="progress-shell"><div id="budgetProgress" class="progress-fill budget" role="progressbar" aria-label="Ingresos ya asignados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+            </div>
+          </div>
+
+          <div class="hero-actions">
+            <button class="primary" type="button" id="heroAddExpenseBtn">Añadir gasto</button>
+            <button class="secondary" type="button" id="heroSimulatorBtn">Simular compra</button>
+          </div>
         </article>
 
-        <div class="metrics-grid">
-          <article class="metric card"><span>Ingresos</span><strong id="kpiIncome">0,00 €</strong></article>
-          <article class="metric card"><span>Comprometido</span><strong id="kpiCommitted">0,00 €</strong></article>
-          <article class="metric card"><span>Variable gastado</span><strong id="kpiVariable">0,00 €</strong></article>
-          <article class="metric card"><span>Ahorro reservado</span><strong id="kpiSavings">0,00 €</strong></article>
+        <article id="setupGuide" class="setup-card card" hidden>
+          <div class="setup-copy">
+            <div class="setup-title-row"><div class="eyebrow">PRIMEROS PASOS</div><button type="button" class="link-btn" id="dismissSetupBtn">Ahora no</button></div>
+            <h2>Configura tu margen real</h2>
+            <p>Completa estos datos para que MyMoney pueda decirte cuánto puedes gastar sin terminar el mes en negativo.</p>
+          </div>
+          <div class="setup-grid">
+            <button type="button" class="setup-step" data-open-modal="income"><span>1</span><strong>Ingresos</strong><small>Lo que entra cada mes</small></button>
+            <button type="button" class="setup-step" data-open-modal="fixed"><span>2</span><strong>Gastos fijos</strong><small>Recibos y obligaciones</small></button>
+            <button type="button" class="setup-step" data-open-modal="finance"><span>3</span><strong>Financiaciones</strong><small>Todas tus cuotas activas</small></button>
+          </div>
+        </article>
+
+        <div class="metrics-grid home-metrics">
+          <article class="metric card" data-tone="blue"><span>Ingresos</span><strong id="kpiIncome">0,00 €</strong><small>Total mensual</small></article>
+          <article class="metric card" data-tone="purple"><span>Ya reservado</span><strong id="kpiCommitted">0,00 €</strong><small>Fijos, cuotas y ahorro</small></article>
+          <article class="metric card" data-tone="orange"><span>Gastado</span><strong id="kpiVariable">0,00 €</strong><small>Variable este mes</small></article>
+          <article class="metric card" data-tone="cyan"><span>Ahorro + colchón</span><strong id="kpiSavings">0,00 €</strong><small>Dinero protegido</small></article>
         </div>
 
         <article class="card">
           <div class="section-title-row">
-            <h2>Distribución del mes</h2>
-            <span class="chip" id="commitmentPct">0% comprometido</span>
+            <div><div class="eyebrow">DESGLOSE</div><h2>Así se reparte tu dinero</h2></div>
+            <span class="chip" id="commitmentPct">0% reservado</span>
           </div>
-          <div class="donut-wrap">
-            <div id="budgetDonut" class="donut"><div class="donut-hole"><strong id="donutFree">0%</strong><span>libre</span></div></div>
-            <div id="donutLegend" class="legend"></div>
+          <div class="allocation-head">
+            <span>Margen después de todo</span>
+            <strong id="allocationFree">0,00 €</strong>
           </div>
+          <div id="budgetStack" class="budget-stack" role="img" aria-label="Distribución mensual"></div>
+          <div id="budgetLegend" class="allocation-list"></div>
         </article>
 
         <article class="card">
           <div class="section-title-row">
-            <h2>Próximos pagos</h2>
+            <div><div class="eyebrow">AGENDA</div><h2>Próximos pagos</h2></div>
             <button class="link-btn" data-go="planning">Ver calendario</button>
           </div>
           <div id="upcomingPayments"></div>
@@ -68,48 +102,34 @@
 
         <article class="card">
           <div class="section-title-row">
-            <h2>Alertas inteligentes</h2>
-            <span class="chip">Automáticas</span>
+            <div><div class="eyebrow">ANÁLISIS</div><h2>Lo que debes saber</h2></div>
+            <span class="chip">Automático</span>
           </div>
           <div id="smartAlerts"></div>
-        </article>
-
-        <article class="card">
-          <div class="section-title-row">
-            <h2>Resumen rápido</h2>
-            <button class="link-btn" data-go="more">Ver historial</button>
-          </div>
-          <div class="summary-lines">
-            <div><span>Gastos fijos</span><strong id="sumFixed">0,00 €</strong></div>
-            <div><span>Cuotas financiadas</span><strong id="sumFinance">0,00 €</strong></div>
-            <div><span>Ahorro mensual</span><strong id="sumSavings">0,00 €</strong></div>
-            <div><span>Colchón sin tocar</span><strong id="sumReserve">0,00 €</strong></div>
-          </div>
         </article>
       </section>
 
       <section id="view-movements" class="view">
         <div class="section-head">
           <div><div class="eyebrow">ENTRADAS Y SALIDAS</div><h2>Movimientos</h2></div>
-          <button class="primary small-btn" id="addVariableBtn">+ Gasto</button>
         </div>
 
         <article class="card">
           <h3>Ingresos fijos mensuales</h3>
           <div id="incomeList"></div>
-          <button class="secondary full" id="addIncomeBtn">+ Añadir ingreso</button>
+          <button class="secondary full" id="addIncomeBtn">Añadir ingreso</button>
         </article>
 
         <article class="card">
           <h3>Gastos fijos mensuales</h3>
           <div id="fixedList"></div>
-          <button class="secondary full" id="addFixedBtn">+ Añadir gasto fijo</button>
+          <button class="secondary full" id="addFixedBtn">Añadir gasto fijo</button>
         </article>
 
         <article class="card">
           <div class="section-title-row">
             <h3>Gastos variables del mes</h3>
-            <button class="link-btn" id="addVariableLink">Añadir</button>
+            <button class="link-btn" id="addVariableLink">Añadir gasto</button>
           </div>
           <div class="filters">
             <input id="expenseSearch" type="search" placeholder="Buscar gasto">
@@ -124,7 +144,7 @@
         <article class="card">
           <div class="section-title-row">
             <h3>Presupuestos por categoría</h3>
-            <button class="link-btn" id="addCategoryBudgetBtn">Añadir</button>
+            <button class="link-btn" id="addCategoryBudgetBtn">Añadir límite</button>
           </div>
           <p class="muted small">Opcional. Sirve para avisarte si, por ejemplo, te estás acercando al límite de supermercado u ocio.</p>
           <div id="categoryBudgets"></div>
@@ -134,7 +154,7 @@
       <section id="view-financing" class="view">
         <div class="section-head">
           <div><div class="eyebrow">CUOTAS Y DEUDAS</div><h2>Mis financiaciones</h2></div>
-          <button class="primary small-btn" id="addFinanceBtn">+ Nueva</button>
+          <button class="primary small-btn" id="addFinanceBtn">Añadir</button>
         </div>
 
         <div class="metrics-grid">
@@ -162,8 +182,22 @@
 
       <section id="view-planning" class="view">
         <div class="section-head">
-          <div><div class="eyebrow">MIRAR HACIA DELANTE</div><h2>Planificación</h2></div>
+          <div><div class="eyebrow">DECIDIR CON DATOS</div><h2>Planificación</h2></div>
         </div>
+
+        <article class="card simulator-card" id="simulatorCard">
+          <div class="section-title-row">
+            <div><div class="eyebrow">DECISIÓN RÁPIDA</div><h3>¿Me lo puedo permitir?</h3></div>
+            <span class="chip">No guarda cambios</span>
+          </div>
+          <p class="muted small">Prueba una compra. Si la financias, MyMoney tendrá en cuenta todas tus cuotas y compromisos actuales.</p>
+          <div class="sim-grid">
+            <div class="field"><label for="simPrice">Precio de la compra</label><input id="simPrice" inputmode="decimal" placeholder="Ej. 1200"></div>
+            <div class="field"><label for="simMode">Forma de pago</label><select id="simMode"><option value="cash">Al contado</option><option value="finance">Financiado</option></select></div>
+            <div class="field" id="simMonthsWrap" hidden><label for="simMonths">Número de meses</label><input id="simMonths" inputmode="numeric" value="12"></div>
+          </div>
+          <div id="simResult" class="sim-result neutral" aria-live="polite">Introduce un precio para simular.</div>
+        </article>
 
         <article class="card">
           <div class="section-title-row">
@@ -172,7 +206,7 @@
           </div>
           <p class="muted small">Usa tus ingresos, fijos, cuotas, ahorro y una estimación de gasto variable mensual.</p>
           <div class="field">
-            <label>Gasto variable mensual estimado</label>
+            <label for="expectedVariable">Gasto variable mensual estimado</label>
             <input id="expectedVariable" inputmode="decimal" placeholder="Ej. 400">
           </div>
           <div id="forecastChart" class="forecast-chart"></div>
@@ -190,17 +224,6 @@
             <button class="link-btn" id="addGoalBtn">Añadir</button>
           </div>
           <div id="goalList"></div>
-        </article>
-
-        <article class="card">
-          <h3>Simulador “¿Me lo puedo permitir?”</h3>
-          <p class="muted small">Prueba una compra sin modificar tus datos.</p>
-          <div class="sim-grid">
-            <div class="field"><label>Precio</label><input id="simPrice" inputmode="decimal" placeholder="0"></div>
-            <div class="field"><label>Pago</label><select id="simMode"><option value="cash">Al contado</option><option value="finance">Financiado</option></select></div>
-            <div class="field" id="simMonthsWrap" hidden><label>Meses</label><input id="simMonths" inputmode="numeric" value="12"></div>
-          </div>
-          <div id="simResult" class="info-box">Introduce un precio para simular.</div>
         </article>
       </section>
 
@@ -221,11 +244,11 @@
         <article class="card">
           <h3>Ajustes de seguridad</h3>
           <div class="field">
-            <label>Colchón mensual que no quieres gastar</label>
+            <label for="reserveInput">Colchón mensual que no quieres gastar</label>
             <input id="reserveInput" inputmode="decimal" placeholder="Ej. 150">
           </div>
           <div class="field">
-            <label>Aviso cuando quede menos del…</label>
+            <label for="warningThreshold">Aviso cuando quede menos del…</label>
             <select id="warningThreshold">
               <option value="0.05">5% de los ingresos</option>
               <option value="0.10">10% de los ingresos</option>
@@ -253,7 +276,7 @@
         <article class="card">
           <h3>Estado de la app</h3>
           <div class="summary-lines compact">
-            <div><span>Versión</span><strong>2.2</strong></div>
+            <div><span>Versión</span><strong>3.0</strong></div>
             <div><span>Modo offline</span><strong id="offlineStatus">Disponible</strong></div>
             <div><span>Última copia exportada</span><strong id="lastBackup">Nunca</strong></div>
           </div>
@@ -262,10 +285,19 @@
     </main>
 
     <nav class="bottom-nav" aria-label="Navegación principal">
-      <button class="nav-btn active" data-view="home"><span>⌂</span><small>Inicio</small></button>
-      <button class="nav-btn" data-view="movements">
-        <span class="nav-svg" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img">
+      <button class="nav-btn active" type="button" data-view="home" aria-current="page">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 10.75 12 3l9 7.75"></path>
+            <path d="M5.5 9.5V21h13V9.5"></path>
+            <path d="M9.5 21v-6h5v6"></path>
+          </svg>
+        </span>
+        <small>Inicio</small>
+      </button>
+      <button class="nav-btn" type="button" data-view="movements">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
             <path d="M8 4v15"></path>
             <path d="M4.5 7.5L8 4l3.5 3.5"></path>
             <path d="M16 20V5"></path>
@@ -274,23 +306,51 @@
         </span>
         <small>Movimientos</small>
       </button>
-      <button class="nav-btn" data-view="financing"><span>▤</span><small>Financiaciones</small></button>
-      <button class="nav-btn" data-view="planning"><span>◫</span><small>Planificar</small></button>
-      <button class="nav-btn" data-view="more"><span>•••</span><small>Más</small></button>
+      <button class="nav-btn" type="button" data-view="financing">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2.5"></rect>
+            <path d="M3 10h18"></path>
+            <path d="M7 15h4"></path>
+            <path d="M15.5 15h1.5"></path>
+          </svg>
+        </span>
+        <small>Cuotas</small>
+      </button>
+      <button class="nav-btn" type="button" data-view="planning">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="16" rx="2.5"></rect>
+            <path d="M8 3v4M16 3v4M3 10h18"></path>
+            <path d="m13.5 16 1.8 1.8 3.7-4"></path>
+          </svg>
+        </span>
+        <small>Planificar</small>
+      </button>
+      <button class="nav-btn" type="button" data-view="more">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <circle cx="5" cy="12" r="1.4"></circle>
+            <circle cx="12" cy="12" r="1.4"></circle>
+            <circle cx="19" cy="12" r="1.4"></circle>
+          </svg>
+        </span>
+        <small>Más</small>
+      </button>
     </nav>
   </div>
 
   <div id="modalBackdrop" class="modal-backdrop" hidden>
-    <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-head">
         <h3 id="modalTitle">Añadir</h3>
-        <button class="icon-btn subtle" id="modalCloseBtn">×</button>
+        <button class="icon-btn subtle" type="button" id="modalCloseBtn" aria-label="Cerrar">×</button>
       </div>
       <form id="modalForm"></form>
     </div>
   </div>
 
-  <div id="toast" class="toast" hidden></div>
-  <script src="app.js"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js?v=3.0.3"></script>
 </body>
 </html>
