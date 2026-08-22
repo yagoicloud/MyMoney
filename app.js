@@ -60,12 +60,21 @@ function normalizeFixedExpense(expense={}){
   const frequency=fixedFrequencyInfo(expense.frequency).value;
   return {...expense,frequency,nextChargeMonth:frequency==='monthly'?'':(expense.nextChargeMonth||'')};
 }
+function inferFinanceService(finance={}){
+  if(finance.service) return finance.service;
+  const providers=['Amazon','Klarna','Oney','Sequra','PayPal'];
+  return providers.find(provider=>new RegExp(`\\b${provider}\\b`,'i').test(String(finance.notes||'')))||'';
+}
+function normalizeFinance(finance={}){
+  return {...finance,service:inferFinanceService(finance)};
+}
 
 function baseState(){
   return {
-    version:3,
+    version:4,
     createdAt:nowISO(),
     incomes:[],
+    variableIncomes:[],
     fixed:[],
     finances:[],
     variables:[],
@@ -92,10 +101,10 @@ function migrateOld(){
     const fresh=baseState();
     if(Array.isArray(old.incomes)) fresh.incomes=old.incomes.map(x=>({id:uid('inc'),name:x.name||'Ingreso',amount:x.amount||'',day:1,active:true}));
     if(Array.isArray(old.fixed)) fresh.fixed=old.fixed.map(x=>normalizeFixedExpense({id:uid('fix'),name:x.name||'Gasto fijo',amount:x.amount||'',day:1,category:'Hogar',active:true}));
-    if(Array.isArray(old.finances)) fresh.finances=old.finances.map(x=>({
+    if(Array.isArray(old.finances)) fresh.finances=old.finances.map(x=>normalizeFinance({
       id:uid('fin'),name:x.name||'Financiación',monthlyAmount:x.amount||'',dueDay:1,
       createdMonth:currentYM(),paidAtCreation:0,totalInstallments:'',
-      endMonth:x.end||'',totalFinanced:'',active:true,notes:''
+      endMonth:x.end||'',totalFinanced:'',active:true,notes:'',service:''
     }));
     if(Array.isArray(old.variables)) fresh.variables=old.variables.map(x=>({
       id:uid('var'),name:x.name||'Gasto',amount:x.amount||'',date:`${x.month||currentYM()}-01`,
@@ -124,8 +133,10 @@ function load(){
   });
   const fixedNeedsMigration=(state.fixed||[]).some(expense=>!expense.frequency || expense.nextChargeMonth===undefined);
   state.fixed=(state.fixed||[]).map(normalizeFixedExpense);
-  const versionNeedsMigration=state.version!==3;
-  state.version=3;
+  state.variableIncomes=Array.isArray(state.variableIncomes)?state.variableIncomes:[];
+  state.finances=(state.finances||[]).map(normalizeFinance);
+  const versionNeedsMigration=state.version!==4;
+  state.version=4;
   if(state.incomes.length!==incomeCountBeforeCleanup || fixedNeedsMigration || versionNeedsMigration) save();
 }
 function save(){
@@ -134,6 +145,15 @@ function save(){
 
 function recurringIncome(ym=currentYM()){
   return state.incomes.filter(x=>x.active!==false).reduce((a,x)=>a+num(x.amount),0);
+}
+function variableIncomesForMonth(ym=currentYM()){
+  return state.variableIncomes.filter(income=>String(income.date||'').slice(0,7)===ym);
+}
+function variableIncome(ym=currentYM()){
+  return variableIncomesForMonth(ym).reduce((total,income)=>total+num(income.amount),0);
+}
+function totalIncome(ym=currentYM()){
+  return recurringIncome(ym)+variableIncome(ym);
 }
 function recurringFixed(ym=currentYM()){
   return state.fixed.filter(x=>fixedActiveInMonth(x,ym)).reduce((a,x)=>a+num(x.amount),0);
@@ -185,7 +205,7 @@ function variableSpent(ym=currentYM()){
   return varsForMonth(ym).reduce((a,v)=>a+num(v.amount),0);
 }
 function calcMonth(ym=currentYM(), useActual=true){
-  const income=recurringIncome(ym);
+  const income=totalIncome(ym);
   const fixed=recurringFixed(ym);
   const finance=monthlyFinance(ym);
   const savings=goalMonthly();
@@ -205,7 +225,11 @@ function financingPaidCount(f, targetYM=currentYM()){
 }
 function financingRemainingCount(f){
   const total=Math.max(0,parseInt(f.totalInstallments)||0);
-  if(!total) return null;
+  if(!total){
+    const end=financeEndMonth(f);
+    if(!end) return null;
+    return Math.max(0,monthDiff(currentYM(),end)+1);
+  }
   return Math.max(0,total-financingPaidCount(f));
 }
 function financingRemainingAmount(f){
@@ -359,6 +383,17 @@ function renderSmartAlerts(c){
 function renderMovements(){
   const incomes=document.getElementById('incomeList');
   incomes.innerHTML=state.incomes.length?state.incomes.map(x=>listEditable(x,'income')).join(''):'<div class="empty">No hay ingresos.</div>';
+  const variableIncomes=variableIncomesForMonth().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  document.getElementById('variableIncomeList').innerHTML=variableIncomes.length?variableIncomes.map(income=>`
+    <div class="list-item">
+      <div class="list-main"><div class="list-title">${esc(income.name||'Ingreso puntual')}</div><div class="list-meta">${formatDate(income.date)}${income.notes?` · ${esc(income.notes)}`:''}</div></div>
+      <div class="list-amount">+${eur(income.amount)}</div>
+      <div class="item-actions">
+        <button class="mini-btn" aria-label="Editar ${esc(income.name||'ingreso')}" onclick="editEntity('variableIncome','${income.id}')">Editar</button>
+        <button class="mini-btn delete" aria-label="Eliminar ${esc(income.name||'ingreso')}" onclick="deleteEntity('variableIncome','${income.id}')">✕</button>
+      </div>
+    </div>`).join(''):'<div class="empty">No hay ingresos puntuales este mes.</div>';
+  document.getElementById('variableIncomeTotalFooter').textContent=eur(variableIncome());
   const fixed=document.getElementById('fixedList');
   fixed.innerHTML=state.fixed.length?state.fixed.map(x=>listEditable(x,'fixed')).join(''):'<div class="empty">No hay gastos fijos o periódicos.</div>';
 
@@ -426,7 +461,7 @@ function renderFinancing(){
   const active=state.finances.filter(f=>financeActiveInMonth(f));
   const monthly=active.reduce((a,f)=>a+num(f.monthlyAmount),0);
   const rem=active.reduce((a,f)=>a+financingRemainingAmount(f),0);
-  const income=recurringIncome();
+  const income=totalIncome();
   document.getElementById('financeMonthlyTotal').textContent=eur(monthly);
   document.getElementById('financeRemainingTotal').textContent=eur(rem);
   document.getElementById('financeActiveCount').textContent=String(active.length);
@@ -437,7 +472,7 @@ function renderFinancing(){
     const ratio=total?paid/total:0, end=financeEndMonth(f);
     return `<div class="finance-card">
       <div class="finance-top">
-        <div><div class="finance-name">${esc(f.name||'Financiación')}</div><div class="list-meta">Día ${f.dueDay||1}${end?` · termina ${monthName(end)}`:''}</div></div>
+        <div><div class="finance-name">${esc(f.name||'Financiación')}</div><div class="list-meta">${f.service?`${esc(f.service)} · `:''}Día ${f.dueDay||1}${end?` · termina ${monthName(end)}`:''}</div></div>
         <div class="finance-amount">${eur(f.monthlyAmount)}/mes</div>
       </div>
       <div class="finance-progress"><div class="budget-track"><div class="budget-fill" style="width:${clamp(ratio*100,0,100)}%"></div></div></div>
@@ -446,7 +481,7 @@ function renderFinancing(){
         <span>${remaining===null?'':`${remaining} restantes`}</span>
       </div>
       <div class="finance-foot" style="margin-top:7px">
-        <span>Pendiente aprox.: ${eur(financingRemainingAmount(f))}</span>
+        <span><strong>Pendiente total: ${eur(financingRemainingAmount(f))}</strong></span>
         <span><button class="mini-btn" aria-label="Editar ${esc(f.name||'financiación')}" onclick="editEntity('finance','${f.id}')">Editar</button> <button class="mini-btn delete" aria-label="Eliminar ${esc(f.name||'financiación')}" onclick="deleteEntity('finance','${f.id}')">✕</button></span>
       </div>
     </div>`;
@@ -566,6 +601,7 @@ function openModal(type,id=null){
   const submitText=editing?'Guardar cambios':'Añadir';
   title.textContent={
     income:editing?'Editar ingreso':'Nuevo ingreso',
+    variableIncome:editing?'Editar ingreso puntual':'Nuevo ingreso puntual',
     fixed:editing?'Editar gasto fijo o periódico':'Nuevo gasto fijo o periódico',
     variable:editing?'Editar gasto':'Nuevo gasto variable',
     finance:editing?'Editar financiación':'Nueva financiación',
@@ -579,6 +615,15 @@ function openModal(type,id=null){
       ${field('Nombre','name',item.name,'Ej. Nómina')}
       <div class="form-grid">${field('Importe mensual','amount',item.amount,'0','decimal')}${field('Día de cobro','day',item.day,'1','numeric')}</div>
       ${checkbox('active','Activo',item.active!==false)}
+    `,submitText,type,id);
+  }
+  if(type==='variableIncome'){
+    item=item||{name:'',amount:'',date:new Date().toISOString().slice(0,10),notes:''};
+    form.innerHTML=formWrap(`
+      ${field('Concepto','name',item.name,'Ej. Trabajo puntual')}
+      <div class="form-grid">${field('Importe','amount',item.amount,'0','decimal')}${dateField('Fecha de cobro','date',item.date)}</div>
+      ${textAreaField('Nota opcional','notes',item.notes,'Ej. Proyecto de agosto')}
+      <div class="info-box small">Este ingreso solo se sumará al mes de la fecha indicada.</div>
     `,submitText,type,id);
   }
   if(type==='fixed'){
@@ -619,9 +664,10 @@ function openModal(type,id=null){
     `,submitText,type,id);
   }
   if(type==='finance'){
-    item=item||{name:'',monthlyAmount:'',dueDay:1,createdMonth:currentYM(),paidAtCreation:0,totalInstallments:'',endMonth:'',totalFinanced:'',active:true,notes:''};
+    item=normalizeFinance(item||{name:'',service:'',monthlyAmount:'',dueDay:1,createdMonth:currentYM(),paidAtCreation:0,totalInstallments:'',endMonth:'',totalFinanced:'',active:true,notes:''});
     form.innerHTML=formWrap(`
       ${field('Producto / financiación','name',item.name,'Ej. iPhone')}
+      ${field('Servicio de financiación','service',item.service,'Ej. Amazon, Klarna, Oney, Sequra o PayPal')}
       <div class="form-grid">${field('Cuota mensual','monthlyAmount',item.monthlyAmount,'0','decimal')}${field('Día de cobro','dueDay',item.dueDay,'1','numeric')}</div>
       <div class="form-grid">${monthField('Mes desde el que la controlas','createdMonth',item.createdMonth)}${field('Cuotas ya pagadas','paidAtCreation',item.paidAtCreation,'0','numeric')}</div>
       <div class="form-grid">${field('Número total de cuotas','totalInstallments',item.totalInstallments,'Ej. 24','numeric')}${monthField('Mes de última cuota','endMonth',item.endMonth)}</div>
@@ -685,12 +731,12 @@ function formWrap(inner,submitText,type,id){
 }
 function closeModal(){ document.getElementById('modalBackdrop').hidden=true; }
 function findEntity(type,id){
-  const map={income:'incomes',fixed:'fixed',variable:'variables',finance:'finances',categoryBudget:'categoryBudgets',goal:'goals'};
+  const map={income:'incomes',variableIncome:'variableIncomes',fixed:'fixed',variable:'variables',finance:'finances',categoryBudget:'categoryBudgets',goal:'goals'};
   return state[map[type]]?.find(x=>x.id===id)||null;
 }
 window.editEntity=(type,id)=>openModal(type,id);
 window.deleteEntity=(type,id)=>{
-  const map={income:'incomes',fixed:'fixed',variable:'variables',finance:'finances',categoryBudget:'categoryBudgets',goal:'goals'};
+  const map={income:'incomes',variableIncome:'variableIncomes',fixed:'fixed',variable:'variables',finance:'finances',categoryBudget:'categoryBudgets',goal:'goals'};
   if(!confirm('¿Seguro que quieres eliminarlo?')) return;
   state[map[type]]=state[map[type]].filter(x=>x.id!==id);
   save();renderAll();toast('Eliminado');
@@ -713,7 +759,7 @@ function handleFormSubmit(e){
     obj.paidAtCreation=Math.max(0,parseInt(obj.paidAtCreation)||0);
     obj.totalInstallments=obj.totalInstallments?Math.max(1,parseInt(obj.totalInstallments)||1):'';
   }
-  const map={income:'incomes',fixed:'fixed',variable:'variables',finance:'finances',categoryBudget:'categoryBudgets',goal:'goals'};
+  const map={income:'incomes',variableIncome:'variableIncomes',fixed:'fixed',variable:'variables',finance:'finances',categoryBudget:'categoryBudgets',goal:'goals'};
   if(id){
     const idx=state[map[type]].findIndex(x=>x.id===id);
     state[map[type]][idx]={...state[map[type]][idx],...obj};
@@ -733,7 +779,7 @@ function closeCurrentMonth(){
 }
 function exportData(){
   state.settings.lastBackup=nowISO();save();renderMore();
-  const payload={app:'MyMoney',version:3,exportedAt:nowISO(),data:state};
+  const payload={app:'MyMoney',version:4,exportedAt:nowISO(),data:state};
   downloadBlob(JSON.stringify(payload,null,2),`mymoney-copia-${new Date().toISOString().slice(0,10)}.json`,'application/json');
   toast('Copia exportada');
 }
@@ -753,12 +799,13 @@ function normalizeImportedData(data){
     (Array.isArray(data.finances) && data.finances.some(f=>'amount' in f && !('monthlyAmount' in f))) ||
     (Array.isArray(data.variables) && data.variables.some(v=>'month' in v && !('date' in v)));
 
-  if(!looksLikeV1) return {...data,version:3,fixed:(data.fixed||[]).map(normalizeFixedExpense)};
+  if(!looksLikeV1) return {...data,version:4,variableIncomes:Array.isArray(data.variableIncomes)?data.variableIncomes:[],fixed:(data.fixed||[]).map(normalizeFixedExpense),finances:(data.finances||[]).map(normalizeFinance)};
 
   const fresh=baseState();
   fresh.incomes=(data.incomes||[]).map(x=>({
     id:x.id||uid('inc'),name:x.name||'Ingreso',amount:x.amount||'',day:x.day||1,active:x.active!==false
   }));
+  fresh.variableIncomes=Array.isArray(data.variableIncomes)?data.variableIncomes:[];
   fresh.fixed=(data.fixed||[]).map(x=>({
     id:x.id||uid('fix'),name:x.name||'Gasto fijo',amount:x.amount||'',day:x.day||1,
     category:x.category||'Hogar',frequency:x.frequency||'monthly',nextChargeMonth:x.nextChargeMonth||'',active:x.active!==false
@@ -768,8 +815,8 @@ function normalizeImportedData(data){
     monthlyAmount:x.monthlyAmount??x.amount??'',dueDay:x.dueDay||1,
     createdMonth:x.createdMonth||currentYM(),paidAtCreation:x.paidAtCreation||0,
     totalInstallments:x.totalInstallments||'',endMonth:x.endMonth??x.end??'',
-    totalFinanced:x.totalFinanced||'',active:x.active!==false,notes:x.notes||''
-  }));
+    totalFinanced:x.totalFinanced||'',active:x.active!==false,notes:x.notes||'',service:x.service||''
+  })).map(normalizeFinance);
   fresh.variables=(data.variables||[]).map(x=>({
     id:x.id||uid('var'),name:x.name||'Gasto',amount:x.amount||'',
     date:x.date||`${x.month||currentYM()}-01`,category:x.category||'Otros',notes:x.notes||''
@@ -790,8 +837,10 @@ function importData(file){
       const data=normalizeImportedData(raw);
       if(!Array.isArray(data.variables)) data.variables=[];
       state={...baseState(),...data};
-      state.version=3;
+      state.version=4;
+      state.variableIncomes=Array.isArray(state.variableIncomes)?state.variableIncomes:[];
       state.fixed=(state.fixed||[]).map(normalizeFixedExpense);
+      state.finances=(state.finances||[]).map(normalizeFinance);
       state.settings={...baseState().settings,...data.settings};
       save();renderAll();toast('Copia importada correctamente');
     }catch(e){ alert('No se pudo importar el archivo. Comprueba que sea una copia válida de MyMoney.'); }
@@ -831,6 +880,7 @@ function bind(){
   document.getElementById('dismissSetupBtn').addEventListener('click',()=>{state.settings.setupDismissed=true;save();renderHome();});
   document.getElementById('addVariableLink').addEventListener('click',()=>openModal('variable'));
   document.getElementById('addIncomeBtn').addEventListener('click',()=>openModal('income'));
+  document.getElementById('addVariableIncomeBtn').addEventListener('click',()=>openModal('variableIncome'));
   document.getElementById('addFixedBtn').addEventListener('click',()=>openModal('fixed'));
   document.getElementById('addFinanceBtn').addEventListener('click',()=>openModal('finance'));
   document.getElementById('addCategoryBudgetBtn').addEventListener('click',()=>openModal('categoryBudget'));

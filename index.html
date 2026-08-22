@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="MyMoney">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="app.css?v=3.1.1">
+  <link rel="stylesheet" href="app.css?v=3.2.0">
   <title>MyMoney</title>
 </head>
 <body>
@@ -118,6 +118,18 @@
           <h3>Ingresos fijos mensuales</h3>
           <div id="incomeList"></div>
           <button class="secondary full" id="addIncomeBtn">Añadir ingreso</button>
+        </article>
+
+        <article class="card">
+          <div class="section-title-row">
+            <h3>Ingresos puntuales del mes</h3>
+            <button class="link-btn" id="addVariableIncomeBtn">Añadir ingreso</button>
+          </div>
+          <p class="muted small">Trabajos, ventas u otros ingresos que solo corresponden a un mes.</p>
+          <div id="variableIncomeList"></div>
+          <div class="summary-lines compact">
+            <div><span>Total del mes</span><strong id="variableIncomeTotalFooter">0,00 €</strong></div>
+          </div>
         </article>
 
         <article class="card">
@@ -276,7 +288,7 @@
         <article class="card">
           <h3>Estado de la app</h3>
           <div class="summary-lines compact">
-            <div><span>Versión</span><strong>3.1.1</strong></div>
+            <div><span>Versión</span><strong>3.2.0</strong></div>
             <div><span>Modo offline</span><strong id="offlineStatus">Disponible</strong></div>
             <div><span>Última copia exportada</span><strong id="lastBackup">Nunca</strong></div>
           </div>
@@ -351,6 +363,6 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="app.js?v=3.1.1"></script>
+  <script src="app.js?v=3.2.0"></script>
 </body>
 </html>

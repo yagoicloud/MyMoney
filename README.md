@@ -10,12 +10,14 @@ Aplicación web instalable (PWA) para iPhone orientada a responder una pregunta 
 - Límite orientativo diario y semanal.
 - Semáforo de riesgo: verde, amarillo y rojo.
 - Ingresos fijos mensuales.
+- Ingresos puntuales asociados únicamente al mes de su fecha.
 - Gastos fijos mensuales y gastos periódicos bimestrales, trimestrales, semestrales o anuales.
 - Gastos variables con fecha, categoría y notas.
 - Límites opcionales por categoría.
 - Sección completa “Mis financiaciones”.
 - Cuota mensual, día de pago, cuotas pagadas, cuotas totales y mes final.
 - Estimación de cuotas restantes y capital pendiente.
+- Servicio asociado a cada financiación (Amazon, Klarna, Oney, Sequra, PayPal u otro).
 - Línea temporal de cuándo se liberan las cuotas.
 - Alertas de carga financiera.
 - Objetivos de ahorro con aportación mensual.
@@ -117,3 +119,9 @@ En GitHub Pages el Service Worker continúa activo para mantener el funcionamien
 - Cambiado a azul neutro el aviso “Sin configurar” para no confundirlo con un presupuesto saludable.
 - Sustituidos los iconos de instalación de 192 y 512 píxeles por la nueva identidad visual de MyMoney.
 - Actualizada la caché offline para que Safari descargue los nuevos recursos.
+
+## Versión 3.2
+- Añadidos ingresos puntuales con fecha, edición y total mensual.
+- Los ingresos puntuales se incorporan al disponible, previsiones e historial solo en el mes correspondiente.
+- Añadido un campo específico para el servicio de cada financiación y migración automática desde notas cuando se reconoce un proveedor habitual.
+- Mostrado el importe total pendiente en cada financiación, también cuando solo se ha indicado el mes de la última cuota.
